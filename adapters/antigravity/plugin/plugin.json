@@ -1,0 +1,5 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "agentic-delivery",
+  "description": "Designer, Engineer, QA, and SRE workflows for taking product work from idea to production readiness."
+}

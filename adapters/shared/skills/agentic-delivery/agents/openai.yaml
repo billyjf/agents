@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agentic Delivery"
+  short_description: "Run the Designer to SRE delivery pipeline"
+  default_prompt: "Use $agentic-delivery to take this change through the appropriate design, engineering, QA, and SRE gates."
