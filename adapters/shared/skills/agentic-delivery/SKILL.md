@@ -1,6 +1,6 @@
 ---
 name: agentic-delivery
-description: Takes a product change from rough intent through the appropriate Designer, Engineer, QA, and SRE gates. Use for end-to-end feature delivery, production-readiness work, implementation from a rough request, or an explicit request to run the agentic delivery pipeline.
+description: Takes a product change from rough intent through the appropriate Designer, Engineer, QA, and SRE gates, with an optional explicitly invoked Infosec audit. Use for end-to-end feature delivery, production-readiness work, implementation from a rough request, or an explicit request to run the agentic delivery pipeline.
 ---
 
 # Agentic Delivery
@@ -15,7 +15,9 @@ Read `references/DELIVERY.md` before acting. Read only the role references neede
 4. Start with SRE when QA has passed and the user requests deployment or production-readiness verification.
 5. Run the complete sequence for an end-to-end delivery request.
 
-If the harness supports named custom agents, delegate each phase to the matching `designer`, `engineer`, `qa`, or `sre` agent. Otherwise, execute the phase directly using its role reference. Keep the main thread responsible for requirements, decisions, and the final consolidated handoff.
+Infosec is not part of that automatic sequence. Use the `infosec` role only when the user explicitly requests Infosec, a security audit, vulnerability assessment, supply-chain review, secret scan, or bounded penetration test. QA may report security defects but must not silently activate Infosec.
+
+If the harness supports named custom agents, delegate each phase to the matching `designer`, `engineer`, `qa`, or `sre` agent. When explicitly requested, delegate the separate audit to `infosec`. Otherwise, execute the requested role directly using its role reference. Keep the main thread responsible for requirements, decisions, and the final consolidated handoff.
 
 ## Enforce the gates
 
@@ -23,6 +25,7 @@ If the harness supports named custom agents, delegate each phase to the matching
 - Do not advance past unresolved high-impact product, data, security, or interface decisions.
 - Require Engineer to map every changed functional/API path to an executable contract test.
 - Keep QA independent and read-only. Return failed or missing contracts to Engineer, then re-run QA.
+- Keep Infosec independent, read-only, explicit-only, and bounded to authorized assets and non-destructive techniques.
 - Require SRE to map latency, traffic, errors, and saturation to instrumentation and an owner action.
 - Defer only speculative scaling beyond the current operating envelope; record its trigger and next rung.
 - Report commands and observations truthfully. Label inference as inference.

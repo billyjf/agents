@@ -19,6 +19,7 @@ ROLE_FILES = {
     "engineer": "ENGINEER.md",
     "qa": "QA.md",
     "sre": "SRE.md",
+    "infosec": "INFOSEC.md",
 }
 BEGIN = "<!-- agentic-delivery:begin -->"
 END = "<!-- agentic-delivery:end -->"
@@ -75,6 +76,8 @@ def render_claude_agent(metadata: dict[str, str], body: str) -> str:
     ]
     if metadata.get("tools"):
         fields.append(f"tools: {metadata['tools']}")
+    if metadata.get("permissionMode"):
+        fields.append(f"permissionMode: {metadata['permissionMode']}")
     fields.extend(
         [
             f"model: {metadata.get('model', 'inherit')}",
@@ -91,7 +94,7 @@ def render_claude_agent(metadata: dict[str, str], body: str) -> str:
 def render_codex_agent(role: str, metadata: dict[str, str], body: str) -> str:
     if "'''" in body:
         raise InstallError(f"Role body for {role} contains unsupported TOML delimiter")
-    sandbox = "read-only" if role == "qa" else "workspace-write"
+    sandbox = "read-only" if role in {"qa", "infosec"} else "workspace-write"
     return (
         f"# {GENERATED}\n"
         f"name = {json.dumps(role)}\n"
@@ -105,11 +108,17 @@ def render_codex_agent(role: str, metadata: dict[str, str], body: str) -> str:
 
 
 def render_role_skill(role: str, metadata: dict[str, str], body: str) -> str:
-    description = (
-        f"Acts as the {role.title()} phase of the agentic delivery pipeline. "
-        f"{metadata['description']} Invoke explicitly when the user names {role.title()} "
-        f"or requests the {role.upper()} phase."
-    )
+    if role == "infosec":
+        description = (
+            "Runs the optional Infosec security-review role only when explicitly invoked. "
+            f"{metadata['description']} Never activate implicitly or as a routine delivery phase."
+        )
+    else:
+        description = (
+            f"Acts as the {role.title()} phase of the agentic delivery pipeline. "
+            f"{metadata['description']} Invoke explicitly when the user names {role.title()} "
+            f"or requests the {role.upper()} phase."
+        )
     return (
         "---\n"
         f"name: {role}\n"
@@ -121,16 +130,49 @@ def render_role_skill(role: str, metadata: dict[str, str], body: str) -> str:
 
 
 def render_openai_yaml(role: str) -> str:
-    short = f"Run the {role.title()} delivery phase"
-    prompt = f"Use ${role} to run the {role.title()} phase for the current task."
+    if role == "infosec":
+        short = "Run an on-demand security audit"
+        prompt = "Use $infosec to perform a scoped, read-only security audit."
+    else:
+        short = f"Run the {role.title()} delivery phase"
+        prompt = f"Use ${role} to run the {role.title()} phase for the current task."
     return (
         "interface:\n"
         f"  display_name: {yaml_scalar(role.title())}\n"
         f"  short_description: {yaml_scalar(short)}\n"
         f"  default_prompt: {yaml_scalar(prompt)}\n"
         "policy:\n"
-        "  allow_implicit_invocation: true\n"
+        f"  allow_implicit_invocation: {'false' if role == 'infosec' else 'true'}\n"
     )
+
+
+def render_gemini_agent(role: str, metadata: dict[str, str], body: str) -> str:
+    fields = [
+        "---",
+        f"name: {role}",
+        f"description: {yaml_scalar(metadata['description'])}",
+        "kind: local",
+    ]
+    if role == "infosec":
+        fields.extend(
+            [
+                "tools:",
+                "  - read_file",
+                "  - grep_search",
+                "  - run_shell_command",
+                "max_turns: 40",
+            ]
+        )
+    fields.extend(
+        [
+            "---",
+            f"<!-- {GENERATED} -->",
+            "",
+            body.rstrip(),
+            "",
+        ]
+    )
+    return "\n".join(fields)
 
 
 def pipeline_skill_files(prefix: Path) -> dict[Path, str]:
@@ -166,6 +208,11 @@ def add_codex_agents(files: dict[Path, str], base: Path) -> None:
         files[base / f"{role}.toml"] = render_codex_agent(role, metadata, body)
 
 
+def add_gemini_agents(files: dict[Path, str], base: Path) -> None:
+    for role, (metadata, body) in role_sources().items():
+        files[base / f"{role}.md"] = render_gemini_agent(role, metadata, body)
+
+
 def project_files(harnesses: set[str]) -> dict[Path, str]:
     files: dict[Path, str] = {
         Path(".agents/pipeline/DELIVERY.md"): read_text(SOURCE_ROOT / "CLAUDE.md"),
@@ -179,7 +226,9 @@ def project_files(harnesses: set[str]) -> dict[Path, str]:
         add_claude_agents(files, Path(".claude/agents"))
     if "codex" in harnesses:
         add_codex_agents(files, Path(".codex/agents"))
-    if harnesses.intersection({"codex", "antigravity"}):
+    if "gemini" in harnesses:
+        add_gemini_agents(files, Path(".gemini/agents"))
+    if harnesses.intersection({"codex", "gemini", "antigravity"}):
         add_shared_skills(files, Path(".agents/skills"))
     if "antigravity" in harnesses:
         files[Path(".agents/rules/agentic-delivery.md")] = read_text(
@@ -194,6 +243,9 @@ def global_files(harnesses: set[str]) -> dict[Path, str]:
         add_claude_agents(files, Path(".claude/agents"))
     if "codex" in harnesses:
         add_codex_agents(files, Path(".codex/agents"))
+        add_shared_skills(files, Path(".agents/skills"))
+    if "gemini" in harnesses:
+        add_gemini_agents(files, Path(".gemini/agents"))
         add_shared_skills(files, Path(".agents/skills"))
     if "antigravity" in harnesses:
         plugin = Path(".gemini/config/plugins/agentic-delivery")
@@ -224,7 +276,10 @@ def codex_block() -> str:
         "When the user names Designer, Engineer, QA, or SRE, delegate to the matching "
         "custom agent when useful and enforce that phase's contract. Keep dependent phases "
         "sequential and keep QA independent/read-only. Repository-specific instructions above "
-        "this block define the project's commands, architecture, deployment, and risk boundaries.\n"
+        "this block define the project's commands, architecture, deployment, and risk boundaries. "
+        "Infosec is an optional read-only role: invoke it only when the user explicitly requests "
+        "Infosec or a security audit, vulnerability assessment, supply-chain review, secret scan, "
+        "or bounded penetration test.\n"
         f"{END}"
     )
 
@@ -308,12 +363,12 @@ def lock_content(
 
 def parse_harnesses(raw: str) -> set[str]:
     values = {item.strip().lower() for item in raw.split(",") if item.strip()}
-    allowed = {"all", "claude", "codex", "antigravity"}
+    allowed = {"all", "claude", "codex", "gemini", "antigravity"}
     unknown = values - allowed
     if unknown:
         raise InstallError(f"Unknown harness: {', '.join(sorted(unknown))}")
     if not values or "all" in values:
-        return {"claude", "codex", "antigravity"}
+        return {"claude", "codex", "gemini", "antigravity"}
     return values
 
 
@@ -416,7 +471,7 @@ def install(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Install the Designer, Engineer, QA, and SRE delivery pipeline."
+        description="Install the Designer, Engineer, QA, SRE, and on-demand Infosec roles."
     )
     parser.add_argument(
         "target",
@@ -432,7 +487,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--harness",
         default="all",
-        help="Comma-separated: all, claude, codex, antigravity (default: all)",
+        help="Comma-separated: all, claude, codex, gemini, antigravity (default: all)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Show changes without writing")
     parser.add_argument("--check", action="store_true", help="Exit nonzero if the installation is missing or stale")

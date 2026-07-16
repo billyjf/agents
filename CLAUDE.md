@@ -97,6 +97,12 @@ Use the monitoring platform already present. Examples include Datadog, Google Cl
 
 SRE also verifies health checks, dashboards or saved queries, actionable alert ownership, secret handling, least privilege, deployment sequencing, rollback, backups/restores where state is involved, and a concise runbook. Reliability gaps return to the engineer and are re-verified.
 
+### Optional on-demand Infosec audit
+
+`infosec` is an independent, read-only security specialist, not a routine delivery phase. Delegate to it only when the user explicitly requests Infosec, a security audit, vulnerability assessment, supply-chain review, secret scan, or bounded penetration test. QA and SRE still enforce their normal security-related acceptance criteria, but they do not automatically invoke Infosec.
+
+Infosec reviews application and API trust boundaries, authentication and authorization, tenant isolation, secret exposure, dependency and build-chain integrity, cloud/runtime configuration, browser/deployed surfaces, and AI/tool boundaries when applicable. Active network testing requires an explicitly named, authorized target and stays non-destructive and low-rate. Infosec reports findings and retest contracts; it does not modify code or claim that a bounded audit proves the system impenetrable.
+
 ### 5. Release handoff
 
 Return a compact decision record:
@@ -150,4 +156,3 @@ Burn down debt while context is fresh:
 - Revisit temporary compatibility paths and feature flags after rollout.
 
 The goal is not zero debt. The goal is deliberate, visible debt that never obscures whether the product is safe to operate.
-

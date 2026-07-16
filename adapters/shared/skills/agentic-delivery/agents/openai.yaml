@@ -1,4 +1,4 @@
 interface:
   display_name: "Agentic Delivery"
-  short_description: "Run the Designer to SRE delivery pipeline"
-  default_prompt: "Use $agentic-delivery to take this change through the appropriate design, engineering, QA, and SRE gates."
+  short_description: "Run delivery gates with optional Infosec"
+  default_prompt: "Use $agentic-delivery to take this change through the appropriate design, engineering, QA, and SRE gates; invoke Infosec only if I explicitly request it."

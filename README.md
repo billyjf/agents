@@ -1,6 +1,6 @@
 # Agentic delivery: idea to production
 
-This repository is a portable operating system for AI-native software delivery. It gives Claude Code, Codex, and Google Antigravity the same four named roles, quality gates, and handoff language while adapting the files to each harness's native format.
+This repository is a portable operating system for AI-native software delivery. It gives Claude Code, Codex, Gemini CLI, and Google Antigravity the same four delivery roles plus an explicitly invoked Infosec reviewer, while adapting the files to each harness's native format.
 
 ```text
 rough idea
@@ -19,6 +19,8 @@ SRE      -> observable, operable, reversible release
    |
    v
 production evidence + next decisions
+
+Infosec (on demand only) -> read-only security and supply-chain audit
 ```
 
 The governing principle is simple: move quickly by making "done" unambiguous. A feature is finished when its behavior is specified, its boundaries are tested, its failure modes are visible, and its release can be operated safely.
@@ -45,11 +47,12 @@ Edit these files when changing the team:
 - [`.claude/agents/ENGINEER.md`](.claude/agents/ENGINEER.md) defines the Engineer role.
 - [`.claude/agents/QA.md`](.claude/agents/QA.md) defines the QA role.
 - [`.claude/agents/SRE.md`](.claude/agents/SRE.md) defines the SRE role.
+- [`.claude/agents/INFOSEC.md`](.claude/agents/INFOSEC.md) defines the optional, read-only Infosec role.
 - [`SCALABILITY.md`](SCALABILITY.md) defines the evidence-based scaling ladder.
 - [`adapters/shared/skills/agentic-delivery/SKILL.md`](adapters/shared/skills/agentic-delivery/SKILL.md) defines portable orchestration for skill-based harnesses.
 - [`VERSION`](VERSION) identifies the snapshot release.
 
-Claude's files remain the readable canonical role format because they are already valid Claude Code project agents and make this repository itself a working demonstration. The installer derives Codex TOML agents, shared Agent Skills, Antigravity rules/plugins, and installed reference snapshots from them.
+Claude's files remain the readable canonical role format because they are already valid Claude Code project agents and make this repository itself a working demonstration. The installer derives Codex TOML agents, Gemini CLI Markdown agents, shared Agent Skills, Antigravity rules/plugins, and installed reference snapshots from them.
 
 Generated files in product repositories say they are generated. Change the source here, bump `VERSION`, and reinstall instead of editing generated snapshots by hand.
 
@@ -61,7 +64,7 @@ Preview first:
 bin/agents-install ../jekyll/bulkbarcode.app --dry-run
 ```
 
-Install all three harness adapters:
+Install all harness adapters:
 
 ```bash
 bin/agents-install ../jekyll/bulkbarcode.app
@@ -84,13 +87,21 @@ bulkbarcode.app/
 ├── .claude/agents/
 │   ├── designer.md
 │   ├── engineer.md
+│   ├── infosec.md
 │   ├── qa.md
 │   └── sre.md
 ├── .codex/agents/
 │   ├── designer.toml
 │   ├── engineer.toml
+│   ├── infosec.toml
 │   ├── qa.toml
 │   └── sre.toml
+├── .gemini/agents/
+│   ├── designer.md
+│   ├── engineer.md
+│   ├── infosec.md
+│   ├── qa.md
+│   └── sre.md
 └── .agents/
     ├── agentic-delivery.lock.json
     ├── pipeline/                     # pinned charter, roles, scale notes, version
@@ -99,11 +110,12 @@ bulkbarcode.app/
         ├── agentic-delivery/
         ├── designer/
         ├── engineer/
+        ├── infosec/
         ├── qa/
         └── sre/
 ```
 
-The `.agents/skills` directory intentionally follows the open Agent Skills shape used by both Codex and Antigravity. Claude uses its native `.claude/agents` definitions. Codex additionally receives native `.codex/agents` TOML definitions so a role can run as an isolated custom agent instead of only as instructions in the main thread.
+The `.agents/skills` directory intentionally follows the open Agent Skills shape used by Codex, Gemini CLI, and Antigravity. Claude uses native `.claude/agents` definitions. Codex receives native `.codex/agents` TOML definitions, and Gemini CLI receives native `.gemini/agents` Markdown definitions, so roles can run as isolated custom agents instead of only as instructions in the main thread.
 
 ## Add project-specific truth
 
@@ -148,15 +160,16 @@ Reinstallation updates only that managed block and preserves everything outside 
 
 The role names and contracts are portable. The runtime primitive and invocation syntax are harness-specific.
 
-| Intent | Claude Code | Codex | Antigravity IDE |
-| --- | --- | --- | --- |
-| Durable repo guidance | `CLAUDE.md` | `AGENTS.md` | `.agents/rules/*.md` |
-| Named isolated role | `.claude/agents/*.md` | `.codex/agents/*.toml` | Invoke the matching Agent Skill/workflow |
-| Portable workflow | Main agent delegates using the charter | `.agents/skills/agentic-delivery` | `.agents/skills/agentic-delivery` |
-| Direct phase | “Use the QA agent” | “Spawn the QA agent” or `$qa` | “Use the qa skill” |
-| Full pipeline | “Run the delivery pipeline” | `$agentic-delivery` | “Use the agentic-delivery skill” |
+| Intent | Claude Code | Codex | Gemini CLI | Antigravity IDE |
+| --- | --- | --- | --- | --- |
+| Durable repo guidance | `CLAUDE.md` | `AGENTS.md` | Project context plus `.agents/skills` | `.agents/rules/*.md` |
+| Named isolated role | `.claude/agents/*.md` | `.codex/agents/*.toml` | `.gemini/agents/*.md` | Invoke the matching Agent Skill/workflow |
+| Portable workflow | Main agent delegates using the charter | `.agents/skills/agentic-delivery` | `.agents/skills/agentic-delivery` | `.agents/skills/agentic-delivery` |
+| Direct QA phase | “Use the QA agent” | “Spawn the QA agent” or `$qa` | “Use the QA agent” or “use the qa skill” | “Use the qa skill” |
+| On-demand audit | “Use the Infosec agent” | `$infosec` or spawn `infosec` | “Use the Infosec agent” or “use the infosec skill” | “Use the infosec skill” |
+| Full pipeline | “Run the delivery pipeline” | `$agentic-delivery` | “Use the agentic-delivery skill” | “Use the agentic-delivery skill” |
 
-There is deliberately no claim that a universal `@qa` command exists. The human vocabulary stays stable—Designer, Engineer, QA, SRE—while the installed adapter translates it into the harness's supported mechanism.
+There is deliberately no claim that a universal `@qa` command exists. The human vocabulary stays stable—Designer, Engineer, QA, SRE, and Infosec—while the installed adapter translates it into the harness's supported mechanism.
 
 ### Claude Code mechanics
 
@@ -167,7 +180,7 @@ cd ../jekyll/bulkbarcode.app
 claude
 ```
 
-Claude loads the target's `CLAUDE.md`, which imports the installed delivery charter. It discovers the four project agents under `.claude/agents/`. Invoke a phase directly:
+Claude loads the target's `CLAUDE.md`, which imports the installed delivery charter. It discovers the project agents under `.claude/agents/`. Invoke a phase directly:
 
 ```text
 Use the qa agent to run the independent QA gate on the current implementation.
@@ -182,6 +195,14 @@ applicable phase, stop on a failed gate, and return the consolidated handoff.
 ```
 
 Claude's main conversation coordinates the work. Each named subagent gets a focused context and returns its result to the main conversation.
+
+Invoke the optional reviewer only by name:
+
+```text
+Use the Infosec agent to perform a read-only security and supply-chain audit of this repository. Do not test network targets or modify files.
+```
+
+The Claude definition sets `permissionMode: plan` and grants inspection, shell, and web-research tools so it can gather evidence without becoming an implementation agent. Its contract prohibits mutation, secret disclosure, and active testing outside an explicitly authorized target.
 
 ### Codex mechanics
 
@@ -211,7 +232,31 @@ Invoke the complete coordinator with:
 Use $agentic-delivery to take this change through the applicable gates.
 ```
 
-The installed `AGENTS.md` block allows Codex to delegate when the named role is useful. QA's Codex custom agent is configured read-only; the write-capable phases retain normal workspace-write isolation and the parent session's approval controls.
+The installed `AGENTS.md` block allows Codex to delegate when the named role is useful. QA and Infosec custom agents are configured read-only; the write-capable phases retain normal workspace-write isolation and the parent session's approval controls. Infosec's Codex skill also sets `allow_implicit_invocation: false`, so `$infosec` or an equally explicit request is required.
+
+### Gemini CLI mechanics
+
+Start Gemini CLI from the target directory:
+
+```bash
+cd ../jekyll/bulkbarcode.app
+gemini
+```
+
+Gemini CLI discovers portable skills under `.agents/skills` and native custom agents under `.gemini/agents`. Custom agents are a Gemini CLI preview feature, so enable agent support if your installed CLI requires it. After installing or updating definitions in an already-running session, reload them:
+
+```text
+/skills reload
+/agents reload
+```
+
+Invoke a native role or the portable skill by name:
+
+```text
+Use the Infosec agent to perform a read-only supply-chain and secret-exposure audit of this repository. Do not test any network target.
+```
+
+Gemini's native agent and its `infosec` Agent Skill carry the same explicit-only contract. Asking for ordinary implementation or QA does not activate Infosec.
 
 ### Antigravity IDE mechanics
 
@@ -228,6 +273,24 @@ Use the agentic-delivery skill and begin at QA. Stop before SRE if QA fails.
 ```
 
 Antigravity presents the roles as skills/workflows rather than assuming Claude's custom-subagent frontmatter. The same role body, acceptance standard, and handoff are preserved.
+
+## Infosec is a sidecar, not a gate
+
+Infosec never runs automatically. The normal delivery sequence remains Designer → Engineer → QA → SRE. QA and SRE continue to catch security defects inside their ordinary contracts, but neither role silently escalates into a broader security audit. A human calls Infosec when a spot check is worth the extra depth.
+
+Use it for a read-only repository audit:
+
+```text
+Use the Infosec agent to audit this repository for reachable application and API vulnerabilities, authorization or tenant-boundary mistakes, secret exposure, vulnerable or suspicious dependencies, CI/build-chain risks, and unsafe production configuration. Do not modify files. Report scope, exact checks, redacted evidence, severity and confidence, standards used, remediation, and a regression contract for every finding.
+```
+
+Limited penetration testing requires more explicit boundaries:
+
+```text
+Use the Infosec agent for a low-rate, non-destructive assessment of https://staging.example.com, which I own and authorize for testing. Test only that hostname using the supplied test account; exclude denial-of-service, brute force, destructive payloads, persistence, social engineering, and third-party services. Stop if the target redirects outside scope.
+```
+
+An audit can establish only what was examined with the named methods on the named date. The role may report `NO FINDINGS IN TESTED SCOPE`; it must never claim that the stack is secure, compliant, penetration-proof, or impenetrable.
 
 ## First Bulk Barcode QA run
 
@@ -274,7 +337,8 @@ Global destinations are:
 ```text
 ~/.claude/agents/                         Claude roles
 ~/.codex/agents/                          Codex roles
-~/.agents/skills/                         Codex skills
+~/.gemini/agents/                         Gemini CLI roles
+~/.agents/skills/                         Codex and Gemini-compatible skills
 ~/.gemini/config/plugins/agentic-delivery Antigravity IDE plugin
 ```
 
@@ -284,7 +348,7 @@ Use global scope for personal consistency. Use project scope when the setup shou
 
 ```text
 bin/agents-install [TARGET]
-bin/agents-install [TARGET] --harness claude,codex,antigravity
+bin/agents-install [TARGET] --harness claude,codex,gemini,antigravity
 bin/agents-install [TARGET] --dry-run
 bin/agents-install [TARGET] --check
 bin/agents-install [TARGET] --force
@@ -299,7 +363,7 @@ bin/agents-install --global
 
 The lock file stores the package version, selected harnesses, a content fingerprint, and the hash of every generated file. On update, the installer overwrites a generated file only when it still matches the previously installed hash. If somebody hand-edited a generated role, installation stops and names the conflict. Reconcile the change into this source repository before using `--force`.
 
-The installer does not install dependencies, run project tests, commit files, change permissions for the coding harness, or access production systems.
+The installer does not install dependencies, run project tests, commit files, change permissions for the coding harness, or access production systems. Installing Infosec definitions does not run an audit.
 
 ## Updating the team
 
@@ -323,7 +387,7 @@ python3 -m unittest discover -s tests -v
 git diff --check
 ```
 
-The regression suite covers fresh project and global installs, existing-instruction preservation, idempotence, harness subsets, lock accumulation, drift detection, and forced recovery. Release validation should also render the generated skills in a temporary project and run the current Agent Skills validator against all five skill folders.
+The regression suite covers fresh project and global installs, existing-instruction preservation, idempotence, harness subsets, lock accumulation, drift detection, and forced recovery. Release validation should also render the generated skills in a temporary project and run the current Agent Skills validator against all six skill folders.
 
 ## Delivery philosophy
 
@@ -341,6 +405,10 @@ The regression suite covers fresh project and global installs, existing-instruct
 - [Codex custom instructions with AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 - [Codex skills](https://learn.chatgpt.com/docs/build-skills)
 - [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [Gemini CLI Agent Skills](https://geminicli.com/docs/cli/using-agent-skills/)
+- [Gemini CLI custom agents](https://github.com/google-gemini/gemini-cli/blob/main/docs/core/subagents.md)
 - [Antigravity Agent Skills](https://antigravity.google/docs/skills)
 - [Antigravity rules and workflows](https://antigravity.google/docs/rules-workflows)
 - [Antigravity plugins](https://antigravity.google/docs/plugins)
+
+Security baselines used by Infosec are verified at audit time. Primary starting points include [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/), [OWASP Top 10](https://owasp.org/Top10/2025/), [OWASP API Security](https://owasp.org/API-Security/), [NIST SSDF](https://csrc.nist.gov/pubs/sp/800/218/final), [CISA Secure by Design](https://www.cisa.gov/securebydesign), [SLSA](https://slsa.dev/), [OpenSSF Scorecard](https://openssf.org/projects/scorecard/), [MITRE CWE Top 25](https://cwe.mitre.org/top25/), and [CVSS](https://www.first.org/cvss/).
